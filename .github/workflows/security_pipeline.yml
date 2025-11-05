@@ -1,32 +1,29 @@
-name: Trivy Security Scan
+name: Security Prototype - The Thousand Hands
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Trivy CLI
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b ~/bin
-          export PATH="$HOME/bin:$PATH"
-          trivy --version
+      - name: Run Trivy file system scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          output: 'trivy-report.txt'
+          severity: 'HIGH,CRITICAL'
 
-      - name: Run Trivy vulnerability scanner (Table + JSON)
-        run: |
-          trivy fs . --ignore-unfixed --severity HIGH,CRITICAL --format table
-          trivy fs . --ignore-unfixed --severity HIGH,CRITICAL --format json -o trivy-report.json
-
-      - name: Upload report artifact
+      - name: Upload Trivy scan results
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-security-report
-          path: trivy-report.json
+          name: trivy-results
+          path: trivy-report.txt
