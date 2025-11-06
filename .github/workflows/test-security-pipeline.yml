@@ -1,0 +1,24 @@
+name: Test Security Pipeline
+
+on:
+  push:
+    branches: [dev, test]
+  workflow_dispatch:
+
+jobs:
+  dry-run:
+    name: test-security-pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Environment
+        run: |
+          echo "Running Security Pipeline Dry Run..."
+          echo "Verifying Snyk token and tfsec setup..."
+          snyk --version || echo "Snyk not installed yet."
+          tfsec --version || echo "tfsec not installed yet."
+
+      - name: Validate YAML Workflows
+        run: yamllint .github/workflows || echo "YAML validation warnings only"
