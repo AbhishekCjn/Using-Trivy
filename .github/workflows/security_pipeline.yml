@@ -12,17 +12,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout Code
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Set up Node.js (for JavaScript or dependency scanning)
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # 3️⃣ Install Dependencies (supports npm or pip)
       - name: Install Dependencies
         run: |
           if [ -f package-lock.json ]; then
@@ -33,19 +30,17 @@ jobs:
             echo "No dependency file found. Skipping installation."
           fi
 
-      # 4️⃣ Set up Snyk CLI (latest stable version)
+      # ✅ Fixed: Use correct Snyk setup version
       - name: Set up Snyk
-        uses: snyk/actions/setup@v4
+        uses: snyk/actions/setup@v1
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      # 5️⃣ Run Snyk Security Scan for all projects
       - name: Run Snyk Scan
         run: snyk test --all-projects --json-file-output=snyk-results.json
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-      # 6️⃣ Upload Snyk Scan Results as artifact
       - name: Upload Snyk Scan Results
         uses: actions/upload-artifact@v4
         with:
@@ -58,11 +53,9 @@ jobs:
     needs: security-scan
 
     steps:
-      # 7️⃣ Checkout Code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 8️⃣ Run tfsec for Infrastructure as Code (Terraform)
       - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
@@ -70,7 +63,6 @@ jobs:
           format: json
           output_file: tfsec-results.json
 
-      # 9️⃣ Upload tfsec Results as artifact
       - name: Upload tfsec Results
         uses: actions/upload-artifact@v4
         with:
@@ -86,13 +78,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 🔟 Download previous scan artifacts
       - name: Download Snyk and tfsec Results
         uses: actions/download-artifact@v4
         with:
           path: ./results
 
-      # 11️⃣ Generate Summary (simple JSON merge and vulnerability count)
       - name: Generate Compliance Summary
         run: |
           echo "🔍 Generating Compliance Summary..."
@@ -101,7 +91,6 @@ jobs:
           echo "---- tfsec Findings ----"
           jq '.results | group_by(.severity) | map({(.[0].severity): length}) | add' results/tfsec-scan-results/tfsec-results.json || echo "No tfsec file found."
 
-      # 12️⃣ Upload Final Compliance Summary
       - name: Upload Summary Report
         uses: actions/upload-artifact@v4
         with:
