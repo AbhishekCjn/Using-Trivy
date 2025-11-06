@@ -1,4 +1,4 @@
-name: Security Prototype - The Thousand Hands
+name: Security Prototype Pipeline
 
 on:
   push:
@@ -6,115 +6,59 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read
-  security-events: write
-
 jobs:
-  trivy-scan:
-    name: Trivy Dependency Scan
+  security-scan:
+    name: Dependency and IaC Security Scan
     runs-on: ubuntu-latest
-    outputs:
-      trivy_ok: ${{ steps.trivy_run.outcome }}
+
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
+      - name: Set up Node.js (if applicable)
+        uses: actions/setup-node@v4
         with:
-          scan-type: 'fs'
-          ignore-unfixed: true
-          format: 'table'
-          output: 'trivy-report.txt'
-          severity: 'HIGH,CRITICAL'
+          node-version: '18'
 
-      - name: Upload Trivy results
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-results
-          path: trivy-report.txt
-
-  tfsec-scan:
-    name: IaC Compliance Scan (tfsec)
-    runs-on: ubuntu-latest
-    outputs:
-      tfsec_ok: ${{ steps.tfsec_run.outcome }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run tfsec
-        id: tfsec_run
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: json
-          output_file: tfsec-results.json
-        continue-on-error: true
-
-      - name: Upload tfsec results (if produced)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfsec-results
-          path: tfsec-results.json
-
-  summarize:
-    name: Generate Compliance Summary
-    runs-on: ubuntu-latest
-    needs: [ trivy-scan, tfsec-scan ]
-    steps:
-      - name: Download Trivy artifact (if exists)
-        uses: actions/download-artifact@v4
-        with:
-          name: trivy-results
-          path: trivy-results
-        continue-on-error: true
-
-      - name: Download tfsec artifact (if exists)
-        uses: actions/download-artifact@v4
-        with:
-          name: tfsec-results
-          path: tfsec-results
-        continue-on-error: true
-
-      - name: Combine reports safely
+      - name: Install Dependencies
         run: |
-          echo "=== TRIVY SCAN REPORT ===" > compliance_summary.txt
-          if [ -f "trivy-results/trivy-report.txt" ]; then
-            cat trivy-results/trivy-report.txt >> compliance_summary.txt
-          else
-            echo "No Trivy report found (no scannable targets or artifact missing)." >> compliance_summary.txt
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f requirements.txt ]; then
+            pip install -r requirements.txt
           fi
 
-          echo -e "\n\n=== TFSEC SCAN REPORT ===" >> compliance_summary.txt
-          if [ -f "tfsec-results/tfsec-results.json" ]; then
-            cat tfsec-results/tfsec-results.json >> compliance_summary.txt
-          else
-            echo "No tfsec report found (no IaC files or artifact missing)." >> compliance_summary.txt
-          fi
+      - name: Run Snyk Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: test --all-projects --json-file-output=snyk-results.json
 
-      - name: Upload Combined Summary
+      - name: Upload Snyk Scan Results
         uses: actions/upload-artifact@v4
         with:
-          name: compliance-summary
-          path: compliance_summary.txt
-            tfsec-scan:
-    name: IaC Compliance Scan (tfsec)
+          name: snyk-scan-results
+          path: snyk-results.json
+
+  compliance-scan:
+    name: IaC Compliance with tfsec
     runs-on: ubuntu-latest
+    needs: security-scan
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
+        uses: aquasecurity/tfsec-action@v1.0.0
         with:
+          soft_fail: false
           format: json
           output_file: tfsec-results.json
 
-      - name: Upload tfsec results
+      - name: Upload tfsec Results
         uses: actions/upload-artifact@v4
         with:
-          name: tfsec-results
+          name: tfsec-scan-results
           path: tfsec-results.json
-
