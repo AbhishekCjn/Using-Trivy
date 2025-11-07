@@ -1,4 +1,4 @@
-name: IaC Compliance Scan (tfsec for Splunk)
+name: IaC Compliance Scan (tfsec)
 
 on:
   push:
@@ -15,29 +15,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ✅ Install tfsec (latest binary - works with new runners)
       - name: Install tfsec
         run: |
-          echo "🔹 Downloading tfsec..."
-          curl -L -o tfsec.tar.gz https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64.tar.gz
-          tar -xzf tfsec.tar.gz
+          echo "🔹 Downloading tfsec binary..."
+          curl -L -o tfsec https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64
+          chmod +x tfsec
           sudo mv tfsec /usr/local/bin/tfsec
           tfsec --version
 
+      # ✅ Run tfsec and save JSON report
       - name: Run tfsec and generate JSON report
         run: |
           mkdir -p reports
-          tfsec. --format json --out reports/tfsec-report.json || true
+          tfsec . --format json --out reports/tfsec-report.json || true
           echo "✅ tfsec scan completed successfully."
           echo "Report generated at: reports/tfsec-report.json"
 
+      # ✅ Validate JSON structure (optional sanity check)
       - name: Validate JSON output
         run: |
           sudo apt-get install -y jq
-          cat reports/tfsec-report.json | jq . > /dev/null || (echo "❌ Invalid JSON" && exit 1)
-          echo "✅ JSON format verified."
+          jq . reports/tfsec-report.json > /dev/null
+          echo "✅ JSON format verified and ready for Splunk upload."
 
-      - name: Upload tfsec JSON report (for Splunk)
+      - name: Upload tfsec JSON report
         uses: actions/upload-artifact@v4
         with:
-          name: tfsec-splunk-report
+          name: tfsec-json-report
           path: reports/tfsec-report.json
