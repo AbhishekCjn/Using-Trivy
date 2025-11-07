@@ -1,0 +1,32 @@
+name: IaC Compliance Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tfsec-scan:
+    name: Run tfsec scan
+    runs-on: ubuntu-latest  # GitHub runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run tfsec (Terraform IaC Security Scan)
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ./
+          format: json
+          output_file: tfsec-report.json
+
+      - name: Upload tfsec report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfsec-security-report
+          path: tfsec-report.json
+
+      - name: Display tfsec summary
+        run: |
+          echo "✅ tfsec scan completed. Report saved as tfsec-report.json"
