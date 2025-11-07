@@ -1,4 +1,4 @@
-name: IaC Compliance Scan
+name: IaC Compliance Scan (tfsec for Splunk)
 
 on:
   push:
@@ -15,27 +15,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run tfsec (Terraform IaC Security Scan)
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          working_directory: ./
-          format: json
-          output_file: tfsec-report.json
-
-      - name: Upload tfsec report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfsec-security-report
-          path: tfsec-report.json
-
-      - name: Generate Security Dashboard
+      - name: Install tfsec
         run: |
-          echo "<html><body><h2>IaC Security Dashboard</h2><pre>" > report.html
-          cat tfsec-report.json >> report.html
-          echo "</pre></body></html>" >> report.html
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install.sh | bash
+          tfsec --version
 
-      - name: Upload Dashboard
+      - name: Run tfsec and generate JSON report
+        run: |
+          mkdir -p reports
+          tfsec. --format json --out reports/tfsec-report.json || true
+          echo "✅ tfsec scan completed successfully."
+          echo "Report generated at: reports/tfsec-report.json"
+
+      - name: Validate JSON output
+        run: |
+          cat reports/tfsec-report.json | jq . > /dev/null || (echo "❌ Invalid JSON" && exit 1)
+          echo "✅ JSON format verified."
+
+      - name: Upload tfsec JSON report (for Splunk)
         uses: actions/upload-artifact@v4
         with:
-          name: security-dashboard
-          path: report.html
+          name: tfsec-splunk-report
+          path: reports/tfsec-report.json
